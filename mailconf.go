@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"html/template"
 	"path"
+	"runtime"
 	"strconv"
 
 	"github.com/gianz74/mailconf/internal/config"
 	"github.com/gianz74/mailconf/internal/cred"
 	"github.com/gianz74/mailconf/internal/io"
 	"github.com/gianz74/mailconf/internal/myterm"
+	"github.com/gianz74/mailconf/internal/os"
 )
 
 var (
@@ -146,10 +148,14 @@ func Generate(cfg *config.Config) error {
 		return err
 	}
 
+	err = generatembsyncrc(runtime.GOOS, cfg)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-//go:embed mu4e.tpl
+//go:embed templates/mu4e.tpl
 var mu4e string
 
 func generatemu4e(cfg *config.Config) error {
@@ -165,6 +171,38 @@ func generatemu4e(cfg *config.Config) error {
 
 	}
 	io.Write(path.Join(cfg.EmacsCfgDir, "mu4e.el"), mu4e.Bytes(), 0644)
+
+	return nil
+}
+
+//go:embed templates/mbsyncrc.tpl
+var mbsyncrc string
+
+func generatembsyncrc(OS string, cfg *config.Config) error {
+	tmpl, err := template.New("mbsyncrc").Parse(mbsyncrc)
+	if err != nil {
+		return err
+	}
+	var mbsyncrc = &bytes.Buffer{}
+	param := struct {
+		OS       string
+		Profiles []*config.Profile
+	}{
+		OS:       runtime.GOOS,
+		Profiles: cfg.Profiles,
+	}
+
+	err = tmpl.Execute(mbsyncrc, param)
+	if err != nil {
+		return err
+
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	io.Write(path.Join(home, ".mbsyncrc"), mbsyncrc.Bytes(), 0644)
 
 	return nil
 }

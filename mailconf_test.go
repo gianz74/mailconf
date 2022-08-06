@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"path"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/gianz74/mailconf/internal/config"
@@ -203,5 +204,56 @@ func TestGeneratemu4e(t *testing.T) {
 			t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
 		}
 
+	}
+}
+
+func TestGeneratembsyncrc(t *testing.T) {
+	tt := []struct {
+		name   string
+		config *config.Config
+		err    error
+	}{
+		{
+			"single",
+			&config.Config{
+				Profiles: []*config.Profile{
+					{
+						Name:     "Work",
+						FullName: "John Doe",
+						Email:    "jdoe@gmail.com",
+						ImapHost: "imap.gmail.com",
+						ImapPort: 993,
+						ImapUser: "user@gmail.com",
+						SmtpHost: "smtp.gmail.com",
+						SmtpPort: 587,
+						SmtpUser: "user@gmail.com",
+					},
+				},
+			},
+			nil,
+		},
+	}
+	setup()
+	defer restore()
+	for _, tc := range tt {
+		err := generatembsyncrc(runtime.GOOS, tc.config)
+		if err != nil {
+			t.Fatalf("cannot generate file: %v", err)
+		}
+
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("cannot get user home dir: %v", err)
+		}
+
+		got, err := os.ReadFile(path.Join(home, ".mbsyncrc"))
+		if err != nil {
+			t.Fatalf("file not saved: %v", err)
+
+		}
+		want := fixture("/generatembsyncrc/" + tc.name + "/" + runtime.GOOS + "/mbsyncrc")
+		if !reflect.DeepEqual(want, got) {
+			t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
+		}
 	}
 }
