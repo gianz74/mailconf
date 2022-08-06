@@ -1,0 +1,91 @@
+* Mailconf design notes
+
+** TODO Commands[1/3]
+- [X] setup [6/6]
+  =setup= will handle the complete configuration of accounts.
+  in more details:
+  - [X] check prerequisites and provide information on how to satisfy them [4/4]
+    - [X] mbsync
+    - [X] imapfilter
+    - [X] goimapnotify
+    - [X] mu
+  - [X] ask for paths: [2/2]
+    - [X] emacs config dir [~/.emacs.d]
+    - [X] user bin directory [~/bin or ~/.local/bin or whatever]
+  - [X] after prerequisites are verified and we know the paths above, copy following files into user's bin directory: [2/2]
+    - [X] syncmail.sh
+    - [X] onnewmail.sh
+  - [X] save collected data to [user config dir]/mailconf/data.json
+  - [X] ask user if he/she wants to define [a] profile[s]:
+  - [X] repeat for every profile: [1/1]
+    - [X] run =profile add <profile>= command
+- cleanup [0/2]
+  =cleanup= will:
+  - [-] disable all installed services
+  - [-] remove all configurations: [0/5]
+    - [-] ~/.mbsyncrc
+    - [-] ~/.imapfilter
+    - [-] [user config dir]/imapnotify
+    - [-] all service files
+    - [-] [user config dir]/mailconf
+- [-] profile [0/4]
+  - [-] list
+    prints the list of configured profiles
+  - [-] add <profile> [0/1]
+    - [-] if setup has been run: [user config dir]/mailconf/data.json exists: [0/1]
+      - [-] if <profile> does not exist: [4/12]
+	- [X] ask imap and smtp data (host, port, username, password)
+	- [X] ask shortcut key for profile selection in mu4e
+	- [X] save credentials in the appropriate keychain
+	- [X] save collected data, json formatted, in config directory, except for password [1/1]
+	  - [X] [user config dir]/mailconf/data.json
+	- [ ] [re]generate mu4e.el configuration
+	- [-] [re]generate ~/.mbsyncrc
+	- [-] [re]generate ~/.imapfilter/{config.lua,certificates}
+	- [-] generate [user config dir]/imapnotify/[profile]/notify.conf
+	- [-] if service file for mbsync does not exist: [0/1]
+	  - [-] generate service file for mbsync
+	- [-] generate service file [service dir]/[imapnotify.profile]
+	- [-] if service file for mbsync just created: [0/1]
+	  - [-] enable service for mbsync
+	- [-] enable service for [imapnotify.profile]
+  - [-] rm <profile> [0/1]
+    - [-] if <profile> exists: [0/8]
+      - [-] disable service for [imapnotify.profile] [0/1]
+	- [-] if <profile> is the last one: [0/1]
+	  - [-] disable service for mbsync
+      - [-] remove service file for [imapnotify.profile] [0/1]
+	- [-] if <profile> is the last one: [0/1]
+	  - [-] remove service for mbsync
+      - [-] remove profile credentials from keychain
+      - [-] remove [user config dir]/imapnotify/[profile]/
+      - [-] if <profile> is the last one: [0/2]
+	- [-] remove ~/.mbsyncrc
+	- [-] remove ~/.imapfilter/
+      - [-] else: [0/2]
+	- [-] regenerate ~/.mbsyncrc
+	- [-] regenerate ~/.imapfilter/{config.lua,certificates}
+      - [-] remove [user config dir]/imapnotify/[profile]/
+      - [-] update [user config dir]/mailconf/data.json
+  - [-] edit [0/1]
+    - [-] if <profile> exists: [0/4]
+      - [-] ask imap and smtp data providing old values as defaults
+      - [-] ask shortcut key for profile selection in mu4e, providing the old value as default
+      - [-] if user wants to change <service> password but no other data: [0/1]
+	- [-] update credentials in the appropriate keychain
+      - [-] if any data for <service>, except for password, has been modified: [0/5]
+	- [-] remove keychain entry for <service><host><port>
+	  considering old values for <service>, <host> and <port>
+	- [-] save credentials for <service><host><port> in the appropriate keychain
+	- [-] save collected data, json formatted, in config directory, except for password [0/1]
+	  - [-] [user config dir]/mailconf/data.json
+	- [-] if =smtp= service or shortcut key has been modified: [0/1]
+	  - [-] regenerate mu4e.el configuration
+	- [-] if =imap= service has been modified: [0/3]
+	  - [-] regenerate ~/.mbsyncrc
+	  - [-] regenerate ~/.imapfilter/{config.lua,certificates}
+	  - [-] regenerate [user config dir]/imapnotify/[profile]/notify.conf
+      
+- [-] help [command]
+  if used alone, provides usage line.
+  otherwise will provide help for the specified command
