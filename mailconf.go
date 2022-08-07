@@ -135,7 +135,7 @@ func AddProfile(profile string, cfg *config.Config) error {
 	}
 	cfg.Profiles = append(cfg.Profiles, p)
 
-	err = Generate(cfg)
+	err = Generate(cfg, p)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func AddProfile(profile string, cfg *config.Config) error {
 	return nil
 }
 
-func Generate(cfg *config.Config) error {
+func Generate(cfg *config.Config, profile *config.Profile) error {
 	err := generatemu4e(cfg)
 	if err != nil {
 		return err
@@ -155,6 +155,11 @@ func Generate(cfg *config.Config) error {
 	}
 
 	err = generateimapfilter(runtime.GOOS, cfg)
+	if err != nil {
+		return err
+	}
+
+	err = generateimapnotify(runtime.GOOS, profile)
 	if err != nil {
 		return err
 	}
@@ -195,7 +200,7 @@ func generatembsyncrc(OS string, cfg *config.Config) error {
 		OS       string
 		Profiles []*config.Profile
 	}{
-		OS:       runtime.GOOS,
+		OS:       OS,
 		Profiles: cfg.Profiles,
 	}
 
@@ -242,7 +247,7 @@ func generateimapfilter(OS string, cfg *config.Config) error {
 		OS       string
 		Profiles []*config.Profile
 	}{
-		OS:       runtime.GOOS,
+		OS:       OS,
 		Profiles: cfg.Profiles,
 	}
 
@@ -257,6 +262,37 @@ func generateimapfilter(OS string, cfg *config.Config) error {
 
 	io.Write(path.Join(home, ".imapfilter/certificates"), certificates, 0644)
 	io.Write(path.Join(home, ".imapfilter/config.lua"), configLua.Bytes(), 0644)
+
+	return nil
+}
+
+//go:embed templates/imapnotify/notify.conf.tmpl
+var imapnotify string
+
+func generateimapnotify(OS string, profile *config.Profile) error {
+	tmpl, err := template.New("imapnotify").Parse(imapnotify)
+	if err != nil {
+		return err
+	}
+
+	param := struct {
+		OS      string
+		Profile *config.Profile
+	}{
+		OS:      OS,
+		Profile: profile,
+	}
+	imapnotify := &bytes.Buffer{}
+	err = tmpl.Execute(imapnotify, param)
+	if err != nil {
+		return err
+	}
+	cfgdir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+
+	io.Write(path.Join(cfgdir, "imapnotify/"+profile.Name+"/notify.conf"), imapnotify.Bytes(), 0644)
 
 	return nil
 }

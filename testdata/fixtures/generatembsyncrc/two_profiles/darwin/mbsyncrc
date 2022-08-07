@@ -1,0 +1,98 @@
+SyncState *
+
+
+IMAPAccount Work
+Host imap.gmail.com
+User user@example.com
+UseKeychain yes
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore Work-remote
+Account Work
+
+MaildirStore Work-local
+SubFolders Verbatim
+Path ~/Maildir/Work/
+Inbox ~/Maildir/Work/INBOX
+
+Channel Work-inbox
+Master :Work-remote:INBOX
+Slave :Work-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel Work-trash
+Master ":Work-remote:[Gmail]/Bin"
+Slave ":Work-local:trash"
+Create Slave
+Sync All
+
+Channel Work-sent
+Master ":Work-remote:[Gmail]/Sent Mail"
+Slave ":Work-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel Work-allmail
+Master ":Work-remote:email-archive"
+Slave ":Work-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group Work
+Channel Work-inbox
+Channel Work-trash
+Channel Work-sent
+Channel Work-allmail
+
+IMAPAccount Personal
+Host imap.gmail.com
+User john.doe@gmail.com
+UseKeychain yes
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore Personal-remote
+Account Personal
+
+MaildirStore Personal-local
+SubFolders Verbatim
+Path ~/Maildir/Personal/
+Inbox ~/Maildir/Personal/INBOX
+
+Channel Personal-inbox
+Master :Personal-remote:INBOX
+Slave :Personal-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel Personal-trash
+Master ":Personal-remote:[Gmail]/Bin"
+Slave ":Personal-local:trash"
+Create Slave
+Sync All
+
+Channel Personal-sent
+Master ":Personal-remote:[Gmail]/Sent Mail"
+Slave ":Personal-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel Personal-allmail
+Master ":Personal-remote:email-archive"
+Slave ":Personal-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group Personal
+Channel Personal-inbox
+Channel Personal-trash
+Channel Personal-sent
+Channel Personal-allmail

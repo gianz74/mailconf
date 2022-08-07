@@ -1,0 +1,15 @@
+{
+        "host": "{{ .Profile.ImapHost }}",
+        "port": {{ .Profile.ImapPort }},
+        "tls": true,
+        "tlsOptions": {
+                "rejectUnauthorized": true
+        },
+        "onNewMail": "mbsync --pull --new {{ .Profile.Name }}-inbox",
+        "onNewMailPost": "onnewmail.sh",
+        "username": "{{ .Profile.ImapUser }}",
+        "passwordCmd": {{if eq .OS "linux"}}"secret-tool lookup user {{ .Profile.ImapUser }} host {{ .Profile.ImapHost }} service imap port {{ .Profile.ImapPort }}"{{else if eq .OS "darwin"}}"security find-internet-password -a {{ .Profile.ImapUser}} -s {{ .Profile.ImapHost }} -r imap -P {{ .Profile.ImapPort }} -w"{{end}},
+        "boxes": [
+                "INBOX"
+        ]
+}
