@@ -16,6 +16,7 @@ import (
 	"github.com/gianz74/mailconf/internal/io"
 	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/gianz74/mailconf/internal/service"
 )
 
 var (
@@ -162,6 +163,93 @@ func Generate(cfg *config.Config, profile *config.Profile) error {
 	err = generateimapnotify(runtime.GOOS, profile)
 	if err != nil {
 		return err
+	}
+
+	mbsync := service.NewMbsync(cfg)
+	err = mbsync.GenConf(false)
+	t := myterm.New()
+	mbsyncNew := true
+	if err != nil {
+		ans, err := t.ReadLine("service file for mbsync already exists. Overwrite? [y/n]: ")
+		if err != nil {
+			return err
+		}
+
+		if len(ans) == 0 {
+			ans = "n"
+		}
+		if ans[0] == 'y' || ans[0] == 'Y' {
+			err := mbsync.Stop()
+			if err != nil {
+				return err
+			}
+
+			err = mbsync.Enable()
+			if err != nil {
+				return err
+			}
+
+			err = mbsync.GenConf(true)
+			if err != nil {
+				return err
+			}
+		} else {
+			mbsyncNew = false
+		}
+	}
+	if mbsyncNew {
+		err = mbsync.Enable()
+		if err != nil {
+			return err
+		}
+
+		err = mbsync.Start()
+		if err != nil {
+			return err
+		}
+	}
+
+	imapnotify := service.NewImapnotify(profile)
+	err = imapnotify.GenConf(false)
+	imapnotifynew := true
+	if err != nil {
+		ans, err := t.ReadLine("imapnotify service file for " + profile.Name + " already exists. Overwrite? [y/n]: ")
+		if err != nil {
+			return err
+		}
+
+		if len(ans) == 0 {
+			ans = "n"
+		}
+		if ans[0] == 'y' || ans[0] == 'Y' {
+			err := imapnotify.Stop()
+			if err != nil {
+				return err
+			}
+
+			err = imapnotify.Disable()
+			if err != nil {
+				return err
+			}
+
+			err = imapnotify.GenConf(true)
+			if err != nil {
+				return err
+			}
+		} else {
+			imapnotifynew = false
+		}
+	}
+	if imapnotifynew {
+		err = imapnotify.Enable()
+		if err != nil {
+			return err
+		}
+
+		err = imapnotify.Start()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
