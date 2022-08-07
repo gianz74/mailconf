@@ -11,10 +11,12 @@ import (
 	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/myterm/memterm"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/spf13/afero"
 )
 
 var checkRequirementsOrig func(string) bool
 var (
+	oldFs         os.FsAccess
 	oldTerm       myterm.Terminal
 	oldCredStore  cred.CredentialsStore
 	mockTerm      = memterm.New()
@@ -27,7 +29,9 @@ func setup() {
 	oldTerm = myterm.SetTerm(mockTerm)
 	checkRequirementsOrig = checkRequirements
 	checkRequirements = func(string) bool { return true }
-	os.Set(os.MemFs)
+	oldFs = os.Set(&afero.Afero{
+		Fs: afero.NewMemMapFs(),
+	})
 	oldCredStore = cred.SetStore(mockCredStore)
 }
 
@@ -35,6 +39,7 @@ func cleanup() {
 	checkRequirements = checkRequirementsOrig
 	myterm.SetTerm(oldTerm)
 	cred.SetStore(oldCredStore)
+	os.Set(oldFs)
 }
 
 func setupConfExists() error {

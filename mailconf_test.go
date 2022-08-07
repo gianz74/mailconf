@@ -15,9 +15,11 @@ import (
 	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/myterm/memterm"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/spf13/afero"
 )
 
 var (
+	oldFs         os.FsAccess
 	oldCredStore  cred.CredentialsStore
 	oldTerm       myterm.Terminal
 	mockTerm      = memterm.New()
@@ -27,12 +29,15 @@ var (
 func setup() {
 	oldTerm = myterm.SetTerm(mockTerm)
 	oldCredStore = cred.SetStore(memcred.New())
-	os.Set(os.MemFs)
+	oldFs = os.Set(&afero.Afero{
+		Fs: afero.NewMemMapFs(),
+	})
 }
 
 func restore() {
 	cred.SetStore(oldCredStore)
 	myterm.SetTerm(oldTerm)
+	os.Set(oldFs)
 }
 
 func fixture(path string) []byte {
