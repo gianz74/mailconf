@@ -9,6 +9,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/gianz74/mailconf/internal/config"
 	"github.com/gianz74/mailconf/internal/cred"
@@ -152,6 +153,12 @@ func Generate(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+
+	err = generateimapfilter(runtime.GOOS, cfg)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -203,6 +210,53 @@ func generatembsyncrc(OS string, cfg *config.Config) error {
 	}
 
 	io.Write(path.Join(home, ".mbsyncrc"), mbsyncrc.Bytes(), 0644)
+
+	return nil
+}
+
+//go:embed templates/imapfilter/config.lua.tmpl
+var configLua string
+
+//go:embed templates/imapfilter/certificates
+var certificates []byte
+
+func normalize(input string) string {
+	fields := strings.FieldsFunc(input, func(r rune) bool {
+		return r == '.' || r == '@'
+	})
+	return strings.Join(fields, "_")
+}
+
+func generateimapfilter(OS string, cfg *config.Config) error {
+	funcMap := template.FuncMap{
+		"normalize": normalize,
+	}
+
+	tmpl, err := template.New("configlua").Funcs(funcMap).Parse(configLua)
+	if err != nil {
+		return err
+	}
+
+	var configLua = &bytes.Buffer{}
+	param := struct {
+		OS       string
+		Profiles []*config.Profile
+	}{
+		OS:       runtime.GOOS,
+		Profiles: cfg.Profiles,
+	}
+
+	err = tmpl.Execute(configLua, param)
+	if err != nil {
+		return err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	io.Write(path.Join(home, ".imapfilter/certificates"), certificates, 0644)
+	io.Write(path.Join(home, ".imapfilter/config.lua"), configLua.Bytes(), 0644)
 
 	return nil
 }

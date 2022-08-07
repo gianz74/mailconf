@@ -1,0 +1,21 @@
+{{ $OS := .OS}}
+function get_pass(server, username, port)
+	{{if eq $OS "linux"}}local status, output = pipe_from("secret-tool lookup user " .. username .. " host " .. server .. " service imap port " .. port){{else if eq $OS "darwin"}}local status, output = pipe_from("security find-internet-password -a " .. username .. " -s " .. server .. " -r imap -P " .. port .. " -w"){{end}}
+assert(status == 0, "password retrieve error")
+	return output
+end
+
+options.timeout = 300
+options.subscribe = true
+{{ range $Profile := .Profiles }}
+{{ normalize $Profile.ImapUser}} = IMAP {
+	server = "{{ $Profile.ImapHost }}",
+	port = {{ $Profile.ImapPort}},
+	ssl = "auto",
+	username = "{{ $Profile.ImapUser }}",
+	password = get_pass("{{ $Profile.ImapHost }}", "{{ $Profile.ImapUser }}", "{{ $Profile.ImapPort }}"),
+}
+
+results = {{ normalize $Profile.ImapUser}}["email-archive"]:is_unseen()
+results:mark_seen()
+{{end}}

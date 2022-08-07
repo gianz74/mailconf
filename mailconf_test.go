@@ -262,3 +262,84 @@ func TestGeneratembsyncrc(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateimapfilter(t *testing.T) {
+	tt := []struct {
+		name   string
+		config *config.Config
+		err    error
+	}{
+		{
+			"single",
+			&config.Config{
+				Profiles: []*config.Profile{
+					{
+						Name:     "Work",
+						FullName: "John Doe",
+						Email:    "jdoe@gmail.com",
+						ImapHost: "imap.gmail.com",
+						ImapPort: 993,
+						ImapUser: "user@gmail.com",
+						SmtpHost: "smtp.gmail.com",
+						SmtpPort: 587,
+						SmtpUser: "user@gmail.com",
+					},
+				},
+			},
+			nil,
+		},
+		{
+			"two_profiles",
+			&config.Config{
+				Profiles: []*config.Profile{
+					{
+						Name:     "Work",
+						FullName: "John Doe",
+						Email:    "user@example.com",
+						ImapHost: "imap.gmail.com",
+						ImapPort: 993,
+						ImapUser: "user@example.com",
+						SmtpHost: "smtp.gmail.com",
+						SmtpPort: 587,
+						SmtpUser: "user@example.com",
+					},
+					{
+						Name:     "Personal",
+						FullName: "John Doe",
+						Email:    "john.doe@gmail.com",
+						ImapHost: "imap.gmail.com",
+						ImapPort: 993,
+						ImapUser: "john.doe@gmail.com",
+						SmtpHost: "smtp.gmail.com",
+						SmtpPort: 587,
+						SmtpUser: "john.doe@gmail.com",
+					},
+				},
+			},
+			nil,
+		},
+	}
+	setup()
+	defer restore()
+	for _, tc := range tt {
+		err := generateimapfilter(runtime.GOOS, tc.config)
+		if err != nil {
+			t.Fatalf("cannot generate file: %v", err)
+		}
+
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("cannot get user home dir: %v", err)
+		}
+
+		got, err := os.ReadFile(path.Join(home, ".imapfilter/config.lua"))
+		if err != nil {
+			t.Fatalf("file not saved: %v", err)
+
+		}
+		want := fixture("/generateimapfilter/" + tc.name + "/" + runtime.GOOS + "/config.lua")
+		if !reflect.DeepEqual(want, got) {
+			t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
+		}
+	}
+}
