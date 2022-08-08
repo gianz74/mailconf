@@ -1,0 +1,13 @@
+[Unit]
+Description=IMAP notifier using IDLE, golang version.
+ConditionPathExists=%h/.config/imapnotify/%I/notify.conf
+After=network.target
+
+[Service]
+Environment="PATH={{ .BinDir }}:/bin:/usr/bin"
+ExecStart=%h/.local/bin/goimapnotify -conf %h/.config/imapnotify/%I/notify.conf
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

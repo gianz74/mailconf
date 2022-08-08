@@ -209,7 +209,7 @@ func Generate(cfg *config.Config, profile *config.Profile) error {
 		}
 	}
 
-	imapnotify := service.NewImapnotify(profile)
+	imapnotify := service.NewImapnotify(cfg, profile)
 	err = imapnotify.GenConf(false)
 	imapnotifynew := true
 	if err != nil {

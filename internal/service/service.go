@@ -39,7 +39,7 @@ func NewMbsyncOs(OS string) func(*config.Config) Service {
 	}
 }
 
-func NewImapnotifyOs(OS string) func(*config.Profile) Service {
+func NewImapnotifyOs(OS string) func(*config.Config, *config.Profile) Service {
 	switch OS {
 	case "linux":
 		return NewImapnotifyLinux
@@ -106,11 +106,11 @@ func (m MbsyncLinux) GenConf(force bool) error {
 	}
 
 	tmp, err := os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.timer"))
-	if err == nil && reflect.DeepEqual(tmp, mbsynctimerlinux) && !force {
+	if err == nil && !(reflect.DeepEqual(tmp, mbsynctimerlinux) || force) {
 		return ErrExists
 	}
 	tmp, err = os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.service"))
-	if err == nil && reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) && !force {
+	if err == nil && !(reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) || force) {
 		return ErrExists
 	}
 
@@ -162,7 +162,7 @@ func (m MbsyncDarwin) GenConf(force bool) error {
 	}
 
 	tmp, err := os.ReadFile(path.Join(homedir, "Library/LaunchAgents/local.mbsync.plist"))
-	if err == nil && reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) && !force {
+	if err == nil && !(reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) || force) {
 		return ErrExists
 	}
 
@@ -174,19 +174,22 @@ func (m MbsyncDarwin) GenConf(force bool) error {
 	return nil
 }
 
-func NewImapnotifyLinux(profile *config.Profile) Service {
+func NewImapnotifyLinux(cfg *config.Config, profile *config.Profile) Service {
 	return ImapnotifyLinux{
+		cfg:     cfg,
 		profile: profile,
 	}
 }
 
-func NewImapnotifyDarwin(profile *config.Profile) Service {
+func NewImapnotifyDarwin(cfg *config.Config, profile *config.Profile) Service {
 	return ImapnotifyDarwin{
+		cfg:     cfg,
 		profile: profile,
 	}
 }
 
 type ImapnotifyLinux struct {
+	cfg     *config.Config
 	profile *config.Profile
 }
 
@@ -206,11 +209,38 @@ func (m ImapnotifyLinux) Disable() error {
 	return nil
 }
 
+//go:embed templates/linux/imapnotify.service.tmpl
+var imapnotifysvclinux string
+
 func (m ImapnotifyLinux) GenConf(force bool) error {
+	tmpl, err := template.New("imapnotify.service").Parse(imapnotifysvclinux)
+	if err != nil {
+		return err
+	}
+	var imapnotifysvc = &bytes.Buffer{}
+
+	err = tmpl.Execute(imapnotifysvc, m.cfg)
+	if err != nil {
+		return err
+
+	}
+	cfgdir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+
+	tmp, err := os.ReadFile(path.Join(cfgdir, "systemd/user/imapnotify@.service"))
+	if err == nil && !(reflect.DeepEqual(tmp, imapnotifysvc.Bytes()) || force) {
+		return ErrExists
+	}
+
+	io.Write(path.Join(cfgdir, "systemd/user/imapnotify@.service"), imapnotifysvc.Bytes(), 0644)
+
 	return nil
 }
 
 type ImapnotifyDarwin struct {
+	cfg     *config.Config
 	profile *config.Profile
 }
 
@@ -230,6 +260,47 @@ func (m ImapnotifyDarwin) Disable() error {
 	return nil
 }
 
+//go:embed templates/darwin/imapnotify.plist.tmpl
+var imapnotifysvcdarwin string
+
 func (m ImapnotifyDarwin) GenConf(force bool) error {
+	tmpl, err := template.New("imapnotify.service").Parse(imapnotifysvcdarwin)
+	if err != nil {
+		return err
+	}
+	var imapnotifysvc = &bytes.Buffer{}
+
+	cfgdir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+
+	param := struct {
+		Cfg     *config.Config
+		Profile *config.Profile
+		CfgDir  string
+	}{
+		Cfg:     m.cfg,
+		Profile: m.profile,
+		CfgDir:  cfgdir,
+	}
+
+	err = tmpl.Execute(imapnotifysvc, param)
+	if err != nil {
+		return err
+
+	}
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	tmp, err := os.ReadFile(path.Join(homedir, "Library/LaunchAgents/local.imapnotify."+m.profile.Name+".plist"))
+	if err == nil && !(reflect.DeepEqual(tmp, imapnotifysvc.Bytes()) || force) {
+		return ErrExists
+	}
+
+	io.Write(path.Join(homedir, "Library/LaunchAgents/local.imapnotify."+m.profile.Name+".plist"), imapnotifysvc.Bytes(), 0644)
+
 	return nil
 }
