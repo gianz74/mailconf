@@ -1,10 +1,17 @@
 package service
 
 import (
+	"bytes"
+	_ "embed"
 	"errors"
+	"path"
+	"reflect"
 	"runtime"
+	"text/template"
 
 	"github.com/gianz74/mailconf/internal/config"
+	"github.com/gianz74/mailconf/internal/io"
+	"github.com/gianz74/mailconf/internal/os"
 )
 
 var (
@@ -75,7 +82,41 @@ func (m MbsyncLinux) Disable() error {
 	return nil
 }
 
+//go:embed templates/linux/mbsync.service.tmpl
+var mbsyncsvclinux string
+
+//go:embed templates/linux/mbsync.timer.tmpl
+var mbsynctimerlinux []byte
+
 func (m MbsyncLinux) GenConf(force bool) error {
+	tmpl, err := template.New("mbsync.service").Parse(mbsyncsvclinux)
+	if err != nil {
+		return err
+	}
+	var mbsyncsvc = &bytes.Buffer{}
+
+	err = tmpl.Execute(mbsyncsvc, m.cfg)
+	if err != nil {
+		return err
+
+	}
+	cfgdir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+
+	tmp, err := os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.timer"))
+	if err == nil && reflect.DeepEqual(tmp, mbsynctimerlinux) && !force {
+		return ErrExists
+	}
+	tmp, err = os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.service"))
+	if err == nil && reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) && !force {
+		return ErrExists
+	}
+
+	io.Write(path.Join(cfgdir, "systemd/user/mbsync.timer"), mbsynctimerlinux, 0644)
+	io.Write(path.Join(cfgdir, "systemd/user/mbsync.service"), mbsyncsvc.Bytes(), 0644)
+
 	return nil
 }
 
@@ -99,7 +140,37 @@ func (m MbsyncDarwin) Disable() error {
 	return nil
 }
 
+//go:embed templates/darwin/local.mbsync.plist.tmpl
+var mbsyncsvcdarwin string
+
 func (m MbsyncDarwin) GenConf(force bool) error {
+
+	tmpl, err := template.New("local.mbsync.plist").Parse(mbsyncsvcdarwin)
+	if err != nil {
+		return err
+	}
+	var mbsyncsvc = &bytes.Buffer{}
+
+	err = tmpl.Execute(mbsyncsvc, m.cfg)
+	if err != nil {
+		return err
+
+	}
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	tmp, err := os.ReadFile(path.Join(homedir, "Library/LaunchAgents/local.mbsync.plist"))
+	if err == nil && reflect.DeepEqual(tmp, mbsyncsvc.Bytes()) && !force {
+		return ErrExists
+	}
+
+	err = io.Write(path.Join(homedir, "Library/LaunchAgents/local.mbsync.plist"), mbsyncsvc.Bytes(), 0644)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -33,7 +33,7 @@
     prints the list of configured profiles
   - [-] add <profile> [0/1]
     - [-] if setup has been run: [user config dir]/mailconf/data.json exists: [0/1]
-      - [-] if <profile> does not exist: [8/12]
+      - [-] if <profile> does not exist: [9/12]
 	- [X] ask imap and smtp data (host, port, username, password)
 	- [X] ask shortcut key for profile selection in mu4e
 	- [X] save credentials in the appropriate keychain
@@ -43,8 +43,8 @@
 	- [X] [re]generate ~/.mbsyncrc
 	- [X] [re]generate ~/.imapfilter/{config.lua,certificates}
 	- [X] generate [user config dir]/imapnotify/[profile]/notify.conf
-	- [-] if service file for mbsync does not exist: [0/1]
-	  - [-] generate service file for mbsync
+	- [X] if service file for mbsync does not exist: [1/1]
+	  - [X] generate service file for mbsync
 	- [-] generate service file [service dir]/[imapnotify.profile]
 	- [-] if service file for mbsync just created: [0/1]
 	  - [-] enable service for mbsync
