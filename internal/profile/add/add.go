@@ -1,15 +1,15 @@
 package add
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 
 	"github.com/gianz74/mailconf"
 	"github.com/gianz74/mailconf/internal/base"
 	"github.com/gianz74/mailconf/internal/config"
+	"github.com/gianz74/mailconf/internal/io"
+	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/os"
-	"golang.org/x/term"
 )
 
 var CmdAdd = &base.Command{
@@ -31,7 +31,6 @@ var (
 	dryrun      bool
 	verbose     bool
 	ErrNoConfig = errors.New("Missing config file.")
-	ErrNoTerm   = errors.New("Not in a terminal.")
 )
 
 func init() {
@@ -41,30 +40,24 @@ func init() {
 }
 
 func runAdd(cmd *base.Command, args []string) error {
+	io.SetWriter(io.GetWriter(dryrun, verbose))
 	cfg := config.Read()
 	if cfg == nil {
 		fmt.Fprintf(os.Stderr, "missing config: run \"mailconf setup\" first.")
 		return ErrNoConfig
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("Profile name: ")
-	scanner.Scan()
-	profile := scanner.Text()
-
-	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
-		fmt.Fprintf(os.Stderr, "not in a terminal\n")
-		return ErrNoTerm
+	t := myterm.New()
+	profile, err := t.ReadLine("Profile name: ")
+	if err != nil {
+		return err
 	}
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 
 	err = mailconf.AddProfile(profile, cfg)
 	if err != nil {
-		term.Restore(int(os.Stdin.Fd()), oldState)
 		fmt.Fprintf(os.Stderr, "Cannot create profile: %v\n", err)
 		return err
 	}
 	cfg.Save()
-	term.Restore(int(os.Stdin.Fd()), oldState)
 	return nil
 }

@@ -73,6 +73,7 @@ func AddProfile(profile string, cfg *config.Config) error {
 	err = c.Add(p.ImapUser, "imap", p.ImapHost, p.ImapPort, string(pwd))
 	if err != nil {
 		prompt := fmt.Sprintf("credentials for imap://%s@%s:%d already exist.\ndo you want to provide a new password? [y/n]: ", p.ImapUser, p.ImapHost, p.ImapPort)
+		fmt.Printf("%s\n", prompt)
 		ans, err := t.ReadLine(prompt)
 		if err != nil {
 			return fmt.Errorf("cannot read answer.")

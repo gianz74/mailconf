@@ -1,0 +1,98 @@
+SyncState *
+
+
+IMAPAccount OldProfile
+Host imap.gmail.com
+User jdoe_old@gmail.com
+PassCmd "secret-tool lookup user jdoe_old@gmail.com host imap.gmail.com service imap port 997"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore OldProfile-remote
+Account OldProfile
+
+MaildirStore OldProfile-local
+SubFolders Verbatim
+Path ~/Maildir/OldProfile/
+Inbox ~/Maildir/OldProfile/INBOX
+
+Channel OldProfile-inbox
+Master :OldProfile-remote:INBOX
+Slave :OldProfile-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel OldProfile-trash
+Master ":OldProfile-remote:[Gmail]/Bin"
+Slave ":OldProfile-local:trash"
+Create Slave
+Sync All
+
+Channel OldProfile-sent
+Master ":OldProfile-remote:[Gmail]/Sent Mail"
+Slave ":OldProfile-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel OldProfile-allmail
+Master ":OldProfile-remote:email-archive"
+Slave ":OldProfile-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group OldProfile
+Channel OldProfile-inbox
+Channel OldProfile-trash
+Channel OldProfile-sent
+Channel OldProfile-allmail
+
+IMAPAccount Test
+Host imap.gmail.com
+User jdoe@gmail.com
+PassCmd "secret-tool lookup user jdoe@gmail.com host imap.gmail.com service imap port 997"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore Test-remote
+Account Test
+
+MaildirStore Test-local
+SubFolders Verbatim
+Path ~/Maildir/Test/
+Inbox ~/Maildir/Test/INBOX
+
+Channel Test-inbox
+Master :Test-remote:INBOX
+Slave :Test-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel Test-trash
+Master ":Test-remote:[Gmail]/Bin"
+Slave ":Test-local:trash"
+Create Slave
+Sync All
+
+Channel Test-sent
+Master ":Test-remote:[Gmail]/Sent Mail"
+Slave ":Test-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel Test-allmail
+Master ":Test-remote:email-archive"
+Slave ":Test-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group Test
+Channel Test-inbox
+Channel Test-trash
+Channel Test-sent
+Channel Test-allmail

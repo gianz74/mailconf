@@ -1,9 +1,9 @@
-package setup
+package add
 
 import (
-	"path"
 	"testing"
 
+	"github.com/gianz74/mailconf"
 	"github.com/gianz74/mailconf/internal/cred"
 	"github.com/gianz74/mailconf/internal/cred/memcred"
 	"github.com/gianz74/mailconf/internal/myterm"
@@ -18,125 +18,103 @@ var (
 	mockCredStore = memcred.New()
 )
 
+type creds struct {
+	imappwd string
+	smtppwd string
+}
+
 func setup() error {
 	myterm.SetTerm(mockTerm)
-	checkRequirements = func(string) bool { return true }
 	os.UserConfigDir = func() (string, error) { return "/home/user/.config", nil }
 	os.UserHomeDir = func() (string, error) { return "/home/user", nil }
 	cred.SetStore(mockCredStore)
 	return nil
 }
 
-func readConf() (string, error) {
-	cfgdir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	cfgFile := path.Join(cfgdir, "mailconf", "data.json")
-	out, err := os.ReadFile(cfgFile)
-	return string(out), err
-}
-
-type creds struct {
-	imappwd string
-	smtppwd string
-}
-
-func TestSetup(t *testing.T) {
+func TestAdd(t *testing.T) {
 	tt := []struct {
-		name    string
-		systems []string
-		creds   []string
-		input   []string
-		cred    *creds
-		err     error
+		name        string
+		systems     []string
+		creds       []string
+		chat        []string
+		expectCreds *creds
+		err         error
 	}{
-
 		{
-			"ConfExists",
+			"NoConfig",
 			[]string{
 				"linux",
 				"darwin",
 			},
 			[]string{},
-			[]string{},
+			[]string{
+				"Test",
+			},
 			nil,
-			ErrExists,
+			ErrNoConfig,
 		},
 		{
-			"ConfNotExisting",
+			"ProfileExists",
 			[]string{
 				"linux",
 				"darwin",
 			},
 			[]string{},
-			[]string{"~/.emacs.d",
-				"~/.local/bin",
-				"n",
+			[]string{
+				"Test",
 			},
 			nil,
+			mailconf.ErrProfileExists,
+		},
+		{
+			"FirstProfile",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			[]string{},
+			[]string{
+				"OldProfile",
+				"John Doe the elder",
+				"jdoe_old@gmail.com",
+				"imap.gmail.com",
+				"997",
+				"jdoe_old@gmail.com",
+				"oldimapsecret",
+				"smtp.gmail.com",
+				"456",
+				"jdoe_old@gmail.com",
+				"oldsmtpsecret",
+			},
+			&creds{
+				"imap://jdoe_old@gmail.com:oldimapsecret@imap.gmail.com:997",
+				"smtp://jdoe_old@gmail.com:oldsmtpsecret@smtp.gmail.com:456",
+			},
 			nil,
 		},
 		{
-			"CreateProfile",
+			"NewProfile",
 			[]string{
 				"linux",
 				"darwin",
 			},
 			[]string{},
 			[]string{
-				"~/.emacs.d",
-				"~/.local/bin",
-				"y",
 				"Test",
 				"John Doe",
 				"jdoe@gmail.com",
 				"imap.gmail.com",
 				"997",
-				"test@gmail.com",
-				"secret",
-				"smtp.gmail.com",
-				"456",
-				"test@gmail.com",
-				"secret",
-				"n",
-			},
-			&creds{
-				"imap://test@gmail.com:secret@imap.gmail.com:997",
-				"smtp://test@gmail.com:secret@smtp.gmail.com:456",
-			},
-			nil,
-		},
-		{
-			"CreateProfile Existing Credentials",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			[]string{
-				"imap://test@gmail.com:secret@imap.gmail.com:997",
-			},
-			[]string{
-				"~/.emacs.d",
-				"~/.local/bin",
-				"y",
-				"Test",
-				"John Doe",
 				"jdoe@gmail.com",
-				"imap.gmail.com",
-				"997",
-				"test@gmail.com",
-				"newsecret",
-				"y",
+				"newimapsecret",
 				"smtp.gmail.com",
 				"456",
-				"test@gmail.com",
-				"secret",
-				"n",
+				"jdoe@gmail.com",
+				"newsmtpsecret",
 			},
 			&creds{
-				"imap://test@gmail.com:newsecret@imap.gmail.com:997",
-				"smtp://test@gmail.com:secret@smtp.gmail.com:456",
+				"imap://jdoe@gmail.com:newimapsecret@imap.gmail.com:997",
+				"smtp://jdoe@gmail.com:newsmtpsecret@smtp.gmail.com:456",
 			},
 			nil,
 		},
@@ -152,9 +130,9 @@ func TestSetup(t *testing.T) {
 				t.Fatalf("%s: cannot prepare environment: %v\n", tc.name, err)
 			}
 
-			mockTerm.SetLines(tc.input)
+			mockTerm.SetLines(tc.chat)
 			mockCredStore.AddBulk(tc.creds)
-			err = runSetup(nil, []string{})
+			err = runAdd(nil, nil)
 			if tc.err != err {
 				t.Fatalf("%s: got error %v, want: %v\n", tc.name, err, tc.err)
 			}
@@ -166,17 +144,18 @@ func TestSetup(t *testing.T) {
 						t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
 					}
 				}
-				if tc.cred != nil {
-					got, want := testutil.CheckCreds(tc.cred.imappwd)
+				if tc.expectCreds != nil {
+					got, want := testutil.CheckCreds(tc.expectCreds.imappwd)
 					if got != want {
 						t.Fatalf("%s: got imap pwd: %s, want: %s\n", tc.name, got, want)
 					}
-					got, want = testutil.CheckCreds(tc.cred.smtppwd)
+					got, want = testutil.CheckCreds(tc.expectCreds.smtppwd)
 					if got != want {
 						t.Fatalf("%s: got smtp pwd: %s, want: %s\n", tc.name, got, want)
 					}
 				}
 			}
+
 		}
 	}
 }

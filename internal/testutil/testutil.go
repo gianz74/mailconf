@@ -5,7 +5,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 
+	"github.com/gianz74/mailconf/internal/cred"
 	myos "github.com/gianz74/mailconf/internal/os"
 	"github.com/spf13/afero"
 )
@@ -110,4 +113,43 @@ func GetFiles(name, system string) <-chan string {
 
 	}(out)
 	return out
+}
+
+func CheckCreds(creds string) (string, string) {
+	exp := regexp.MustCompile(`^(?P<service>[^:]*)://(?P<user>[^:]*):(?P<pwd>[^@]*)@(?P<host>[^:]*):(?P<port>\d+)$`)
+	match := exp.FindStringSubmatch(creds)
+	result := make(map[string]string)
+	for i, name := range exp.SubexpNames() {
+		if i != 0 && name != "" {
+			if i < len(match) {
+				result[name] = match[i]
+			}
+		}
+	}
+	service, ok := result["service"]
+	if !ok {
+		panic("no creds")
+	}
+	user, ok := result["user"]
+	if !ok {
+		panic("no creds")
+	}
+	pwd, ok := result["pwd"]
+	if !ok {
+		panic("no creds")
+	}
+	host, ok := result["host"]
+	if !ok {
+		panic("no creds")
+	}
+	port_s, ok := result["port"]
+	if !ok {
+		panic("no creds")
+	}
+
+	tmp, _ := strconv.ParseUint(port_s, 10, 16)
+	port := uint16(tmp)
+	credstore := cred.New()
+	got, _ := credstore.Get(user, service, host, port)
+	return got, pwd
 }
