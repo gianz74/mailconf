@@ -1,7 +1,6 @@
 package memterm
 
 import (
-	"fmt"
 	"io"
 )
 
@@ -18,7 +17,6 @@ func (t *_memterm) ReadLine(prompt string) (string, error) {
 	if t.current >= 0 && t.current < len(t.lines) {
 		line := t.lines[t.current]
 		t.current++
-		fmt.Printf("reading for [%s], got [%s]\n", prompt, line)
 		return line, nil
 	}
 	return "", io.EOF

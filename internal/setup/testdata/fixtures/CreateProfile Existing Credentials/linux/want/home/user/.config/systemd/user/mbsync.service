@@ -1,0 +1,12 @@
+[Unit]
+Description=mbsync service, sync all mail
+Documentation=man:mbsync(1)
+ConditionPathExists=%h/.mbsyncrc
+
+[Service]
+Environment="PATH=/home/user/.local/bin:/bin:/usr/bin"
+Type=oneshot
+ExecStart=/home/user/.local/bin/syncmail.sh
+
+[Install]
+WantedBy=mail.target

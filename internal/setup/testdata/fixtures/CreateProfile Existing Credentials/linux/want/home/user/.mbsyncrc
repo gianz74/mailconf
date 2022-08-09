@@ -1,0 +1,50 @@
+SyncState *
+
+
+IMAPAccount Test
+Host imap.gmail.com
+User test@gmail.com
+PassCmd "secret-tool lookup user test@gmail.com host imap.gmail.com service imap port 997"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore Test-remote
+Account Test
+
+MaildirStore Test-local
+SubFolders Verbatim
+Path ~/Maildir/Test/
+Inbox ~/Maildir/Test/INBOX
+
+Channel Test-inbox
+Master :Test-remote:INBOX
+Slave :Test-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel Test-trash
+Master ":Test-remote:[Gmail]/Bin"
+Slave ":Test-local:trash"
+Create Slave
+Sync All
+
+Channel Test-sent
+Master ":Test-remote:[Gmail]/Sent Mail"
+Slave ":Test-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel Test-allmail
+Master ":Test-remote:email-archive"
+Slave ":Test-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group Test
+Channel Test-inbox
+Channel Test-trash
+Channel Test-sent
+Channel Test-allmail

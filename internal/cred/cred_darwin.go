@@ -4,7 +4,6 @@ package cred
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/gianz74/mailconf/internal/os"
 )
@@ -21,7 +20,7 @@ type CredentialsStore interface {
 }
 
 func init() {
-	if runtime.GOOS == "darwin" {
+	if os.System == "darwin" {
 		Credentials = Darwin{}
 	}
 }

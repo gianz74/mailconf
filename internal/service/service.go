@@ -6,7 +6,6 @@ import (
 	"errors"
 	"path"
 	"reflect"
-	"runtime"
 	"text/template"
 
 	"github.com/gianz74/mailconf/internal/config"
@@ -15,9 +14,7 @@ import (
 )
 
 var (
-	NewMbsync     = NewMbsyncOs(runtime.GOOS)
-	NewImapnotify = NewImapnotifyOs(runtime.GOOS)
-	ErrExists     = errors.New("config already exists")
+	ErrExists = errors.New("config already exists")
 )
 
 type Service interface {
@@ -28,23 +25,23 @@ type Service interface {
 	GenConf(bool) error
 }
 
-func NewMbsyncOs(OS string) func(*config.Config) Service {
-	switch OS {
+func NewMbsync(cfg *config.Config) Service {
+	switch os.System {
 	case "linux":
-		return NewMbsyncLinux
+		return NewMbsyncLinux(cfg)
 	case "darwin":
-		return NewMbsyncDarwin
+		return NewMbsyncDarwin(cfg)
 	default:
 		return nil
 	}
 }
 
-func NewImapnotifyOs(OS string) func(*config.Config, *config.Profile) Service {
-	switch OS {
+func NewImapnotify(cfg *config.Config, profile *config.Profile) Service {
+	switch os.System {
 	case "linux":
-		return NewImapnotifyLinux
+		return NewImapnotifyLinux(cfg, profile)
 	case "darwin":
-		return NewImapnotifyDarwin
+		return NewImapnotifyDarwin(cfg, profile)
 	default:
 		return nil
 	}

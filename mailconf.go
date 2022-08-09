@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -150,17 +149,17 @@ func Generate(cfg *config.Config, profile *config.Profile) error {
 		return err
 	}
 
-	err = generatembsyncrc(runtime.GOOS, cfg)
+	err = generatembsyncrc(os.System, cfg)
 	if err != nil {
 		return err
 	}
 
-	err = generateimapfilter(runtime.GOOS, cfg)
+	err = generateimapfilter(os.System, cfg)
 	if err != nil {
 		return err
 	}
 
-	err = generateimapnotify(runtime.GOOS, profile)
+	err = generateimapnotify(os.System, profile)
 	if err != nil {
 		return err
 	}

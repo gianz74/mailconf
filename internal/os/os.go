@@ -2,6 +2,7 @@ package os
 
 import (
 	"os"
+	"runtime"
 )
 
 type File = os.File
@@ -13,11 +14,14 @@ type FsAccess interface {
 }
 
 var (
-	fs       FsAccess = osFs{}
-	Stderr            = os.Stderr
-	Stdin             = os.Stdin
-	Stdout            = os.Stdout
-	ModePerm          = os.ModePerm
+	fs            FsAccess = osFs{}
+	Stderr                 = os.Stderr
+	Stdin                  = os.Stdin
+	Stdout                 = os.Stdout
+	ModePerm               = os.ModePerm
+	UserConfigDir          = os.UserConfigDir
+	UserHomeDir            = os.UserHomeDir
+	System                 = runtime.GOOS
 )
 
 func Set(f FsAccess) FsAccess {
@@ -42,14 +46,6 @@ func (osFs) ReadFile(filename string) ([]byte, error) {
 
 func MkdirAll(path string, perm os.FileMode) error {
 	return fs.MkdirAll(path, perm)
-}
-
-func UserHomeDir() (string, error) {
-	return os.UserHomeDir()
-}
-
-func UserConfigDir() (string, error) {
-	return os.UserConfigDir()
 }
 
 func WriteFile(filename string, data []byte, perm os.FileMode) error {

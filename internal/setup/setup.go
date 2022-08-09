@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/gianz74/mailconf"
@@ -59,7 +58,6 @@ func runSetup(cmd *base.Command, args []string) error {
 	io.SetWriter(io.GetWriter(dryrun, verbose))
 	cfg := config.Read()
 	if cfg != nil {
-		fmt.Fprintf(os.Stderr, "config file already exists")
 		return ErrExists
 	}
 
@@ -71,14 +69,12 @@ func runSetup(cmd *base.Command, args []string) error {
 		return err
 	}
 	cfg.EmacsCfgDir = expandUser(emacsdir)
-	fmt.Printf("emacs dir: %s\n", cfg.EmacsCfgDir)
 	bindir, err := t.ReadLine("enter user's bin directory: ")
 	if err != nil {
 		return err
 	}
 
 	cfg.BinDir = expandUser(bindir)
-	fmt.Printf("bin dir: %s\n", cfg.BinDir)
 	if !checkRequirements(cfg.BinDir) {
 		return ErrRequirements
 	}
@@ -93,7 +89,6 @@ func runSetup(cmd *base.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("ans: %s\n", ans)
 
 	if len(ans) == 0 {
 		cfg.Save()
@@ -129,7 +124,6 @@ func runSetup(cmd *base.Command, args []string) error {
 	}
 	err = cfg.Save()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cannot save config file: %v\n", err)
 		return err
 	}
 	return nil
@@ -138,7 +132,7 @@ func runSetup(cmd *base.Command, args []string) error {
 var checkRequirements = _checkRequirements
 
 func _checkRequirements(bindir string) bool {
-	if runtime.GOOS == "linux" {
+	if os.System == "linux" {
 		_, err := exec.LookPath("secret-tool")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "secret-tool not found in PATH.\n")
