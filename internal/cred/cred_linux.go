@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/gianz74/mailconf/internal/options"
+	"github.com/gianz74/mailconf/internal/os"
 )
 
 var (
@@ -45,6 +48,14 @@ func (c Linux) Add(user, service, host string, port uint16, pwd string) error {
 	}
 
 	label := fmt.Sprintf("%s %s password for %s:%d", user, service, host, port)
+	if options.Dryrun() {
+		if options.Verbose() {
+			fmt.Fprintf(os.Stdout, "setting password for %s://%s@%s:%d to %s\n", service, user, host, port, pwd)
+		} else {
+			fmt.Fprintf(os.Stdout, "setting password for %s://%s@%s:%d\n", service, user, host, port)
+		}
+		return nil
+	}
 	cmd := exec.Command("secret-tool", "store", "--label", label, "host", host, "user", user, "port", fmt.Sprintf("%d", port), "service", service)
 	cmd.Stdin = strings.NewReader(pwd)
 	err = cmd.Run()
@@ -71,6 +82,10 @@ func (c Linux) Delete(user, service, host string, port uint16) error {
 		return err
 	}
 
+	if options.Dryrun() {
+		fmt.Fprintf(os.Stdout, "removing password for %s://%s@%s:%d\n", service, user, host, port)
+		return nil
+	}
 	cmd := exec.Command("secret-tool", "clear", "user", user, "host", host, "port", fmt.Sprintf("%d", port), "service", service)
 	err = cmd.Run()
 	if err != nil {
@@ -85,6 +100,14 @@ func (c Linux) Update(user, service, host string, port uint16, pwd string) error
 		return err
 	}
 	label := fmt.Sprintf("%s %s password for %s:%d", user, service, host, port)
+	if options.Dryrun() {
+		if options.Verbose() {
+			fmt.Fprintf(os.Stdout, "updating password for %s://%s@%s:%d to %s\n", service, user, host, port, pwd)
+		} else {
+			fmt.Fprintf(os.Stdout, "updating password for %s://%s@%s:%d\n", service, user, host, port)
+		}
+		return nil
+	}
 	cmd := exec.Command("secret-tool", "store", "--label", label, "host", host, "user", user, "port", fmt.Sprintf("%d", port), "service", service)
 	cmd.Stdin = strings.NewReader(pwd)
 	err = cmd.Run()

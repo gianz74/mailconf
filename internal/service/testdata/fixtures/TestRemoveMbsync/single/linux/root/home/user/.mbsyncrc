@@ -1,0 +1,50 @@
+SyncState *
+
+
+IMAPAccount Work
+Host imap.gmail.com
+User user@gmail.com
+PassCmd "secret-tool lookup user user@gmail.com host imap.gmail.com service imap port 993"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore Work-remote
+Account Work
+
+MaildirStore Work-local
+SubFolders Verbatim
+Path ~/Maildir/Work/
+Inbox ~/Maildir/Work/INBOX
+
+Channel Work-inbox
+Master :Work-remote:INBOX
+Slave :Work-local:INBOX
+Create Slave
+Sync All
+Expunge Both
+
+Channel Work-trash
+Master ":Work-remote:[Gmail]/Bin"
+Slave ":Work-local:trash"
+Create Slave
+Sync All
+
+Channel Work-sent
+Master ":Work-remote:[Gmail]/Sent Mail"
+Slave ":Work-local:sent"
+Create Slave
+Sync All
+Expunge Both
+
+Channel Work-allmail
+Master ":Work-remote:email-archive"
+Slave ":Work-local:email-archive"
+Create Slave
+Sync All
+Expunge Slave
+
+Group Work
+Channel Work-inbox
+Channel Work-trash
+Channel Work-sent
+Channel Work-allmail

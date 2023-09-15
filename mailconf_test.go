@@ -14,6 +14,7 @@ import (
 	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/myterm/memterm"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/gianz74/mailconf/internal/service/mockservice"
 	"github.com/spf13/afero"
 )
 
@@ -31,12 +32,14 @@ func setup() {
 	oldFs = os.Set(&afero.Afero{
 		Fs: afero.NewMemMapFs(),
 	})
+	mockservice.SetupMockServices()
 }
 
 func restore() {
 	cred.SetStore(oldCredStore)
 	myterm.SetTerm(oldTerm)
 	os.Set(oldFs)
+	mockservice.RestoreServices()
 }
 
 func fixture(path string) []byte {
@@ -140,9 +143,9 @@ func TestAddProfile(t *testing.T) {
 		},
 	}
 	cfg := config.NewConfig()
-	setup()
-	defer restore()
 	for _, tc := range tt {
+		setup()
+		defer restore()
 		mockTerm.AddLine(fmt.Sprintf("%s", tc.fullname))
 		mockTerm.AddLine(fmt.Sprintf("%s", tc.email))
 		mockTerm.AddLine(fmt.Sprintf("%s", tc.imaphost))
@@ -194,10 +197,10 @@ func TestGeneratemu4e(t *testing.T) {
 			nil,
 		},
 	}
-	setup()
-	defer restore()
 	for _, tc := range tt {
-		generatemu4e(tc.config)
+		setup()
+		defer restore()
+		generatemu4e(tc.config, false)
 		got, err := os.ReadFile(path.Join(tc.config.EmacsCfgDir, "mu4e.el"))
 		if err != nil {
 			t.Fatalf("file not saved: %v", err)
@@ -208,244 +211,5 @@ func TestGeneratemu4e(t *testing.T) {
 			t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
 		}
 
-	}
-}
-
-func TestGeneratembsyncrc(t *testing.T) {
-	tt := []struct {
-		name    string
-		systems []string
-		config  *config.Config
-		err     error
-	}{
-		{
-			"single",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			&config.Config{
-				Profiles: []*config.Profile{
-					{
-						Name:     "Work",
-						FullName: "John Doe",
-						Email:    "jdoe@gmail.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "user@gmail.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "user@gmail.com",
-					},
-				},
-			},
-			nil,
-		},
-		{
-			"two_profiles",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			&config.Config{
-				Profiles: []*config.Profile{
-					{
-						Name:     "Work",
-						FullName: "John Doe",
-						Email:    "user@example.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "user@example.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "user@example.com",
-					},
-					{
-						Name:     "Personal",
-						FullName: "John Doe",
-						Email:    "john.doe@gmail.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "john.doe@gmail.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "john.doe@gmail.com",
-					},
-				},
-			},
-			nil,
-		},
-	}
-	setup()
-	defer restore()
-	for _, tc := range tt {
-		for _, system := range tc.systems {
-			err := generatembsyncrc(system, tc.config)
-			if err != nil {
-				t.Fatalf("cannot generate file: %v", err)
-			}
-
-			home, err := os.UserHomeDir()
-			if err != nil {
-				t.Fatalf("cannot get user home dir: %v", err)
-			}
-
-			got, err := os.ReadFile(path.Join(home, ".mbsyncrc"))
-			if err != nil {
-				t.Fatalf("file not saved: %v", err)
-
-			}
-			want := fixture("/generatembsyncrc/" + tc.name + "/" + system + "/mbsyncrc")
-			if !reflect.DeepEqual(want, got) {
-				t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
-			}
-		}
-	}
-}
-
-func TestGenerateimapfilter(t *testing.T) {
-	tt := []struct {
-		name    string
-		systems []string
-		config  *config.Config
-		err     error
-	}{
-		{
-			"single",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			&config.Config{
-				Profiles: []*config.Profile{
-					{
-						Name:     "Work",
-						FullName: "John Doe",
-						Email:    "jdoe@gmail.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "user@gmail.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "user@gmail.com",
-					},
-				},
-			},
-			nil,
-		},
-		{
-			"two_profiles",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			&config.Config{
-				Profiles: []*config.Profile{
-					{
-						Name:     "Work",
-						FullName: "John Doe",
-						Email:    "user@example.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "user@example.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "user@example.com",
-					},
-					{
-						Name:     "Personal",
-						FullName: "John Doe",
-						Email:    "john.doe@gmail.com",
-						ImapHost: "imap.gmail.com",
-						ImapPort: 993,
-						ImapUser: "john.doe@gmail.com",
-						SmtpHost: "smtp.gmail.com",
-						SmtpPort: 587,
-						SmtpUser: "john.doe@gmail.com",
-					},
-				},
-			},
-			nil,
-		},
-	}
-	setup()
-	defer restore()
-	for _, tc := range tt {
-		for _, system := range tc.systems {
-			err := generateimapfilter(system, tc.config)
-			if err != nil {
-				t.Fatalf("cannot generate file: %v", err)
-			}
-
-			home, err := os.UserHomeDir()
-			if err != nil {
-				t.Fatalf("cannot get user home dir: %v", err)
-			}
-
-			got, err := os.ReadFile(path.Join(home, ".imapfilter/config.lua"))
-			if err != nil {
-				t.Fatalf("file not saved: %v", err)
-
-			}
-			want := fixture("/generateimapfilter/" + tc.name + "/" + system + "/config.lua")
-			if !reflect.DeepEqual(want, got) {
-				t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
-			}
-		}
-	}
-}
-
-func TestGenerateimapnotify(t *testing.T) {
-	tt := []struct {
-		name    string
-		systems []string
-		profile *config.Profile
-		err     error
-	}{
-		{
-			"single",
-			[]string{
-				"linux",
-				"darwin",
-			},
-			&config.Profile{
-				Name:     "Work",
-				FullName: "John Doe",
-				Email:    "jdoe@gmail.com",
-				ImapHost: "imap.gmail.com",
-				ImapPort: 993,
-				ImapUser: "user@gmail.com",
-				SmtpHost: "smtp.gmail.com",
-				SmtpPort: 587,
-				SmtpUser: "user@gmail.com",
-			},
-			nil,
-		},
-	}
-	setup()
-	defer restore()
-	for _, tc := range tt {
-		for _, system := range tc.systems {
-			err := generateimapnotify(system, tc.profile)
-			if err != nil {
-				t.Fatalf("cannot generate file: %v", err)
-			}
-
-			cfgdir, err := os.UserConfigDir()
-			if err != nil {
-				t.Fatalf("cannot get user home dir: %v", err)
-			}
-
-			fmt.Printf("checking %s\n", tc.profile.Name)
-			got, err := os.ReadFile(path.Join(cfgdir, "imapnotify/"+tc.profile.Name+"/notify.conf"))
-			if err != nil {
-				t.Fatalf("file not saved: %v", err)
-
-			}
-			want := fixture("/generateimapnotify/" + tc.name + "/" + system + "/" + tc.profile.Name + "/notify.conf")
-			if !reflect.DeepEqual(want, got) {
-				t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
-			}
-		}
 	}
 }

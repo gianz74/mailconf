@@ -7,8 +7,8 @@ import (
 	"github.com/gianz74/mailconf"
 	"github.com/gianz74/mailconf/internal/base"
 	"github.com/gianz74/mailconf/internal/config"
-	"github.com/gianz74/mailconf/internal/io"
 	"github.com/gianz74/mailconf/internal/myterm"
+	"github.com/gianz74/mailconf/internal/options"
 	"github.com/gianz74/mailconf/internal/os"
 )
 
@@ -40,7 +40,7 @@ func init() {
 }
 
 func runAdd(cmd *base.Command, args []string) error {
-	io.SetWriter(io.GetWriter(dryrun, verbose))
+	options.Set(options.OptDryrun(dryrun), options.OptVerbose(verbose))
 	cfg := config.Read()
 	if cfg == nil {
 		fmt.Fprintf(os.Stderr, "missing config: run \"mailconf setup\" first.")

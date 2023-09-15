@@ -1,0 +1,28 @@
+{
+	"emacs_cfg_dir": "/home/user/.emacs.d",
+	"bindir": "/home/user/.local/bin",
+	"profiles": [
+		{
+			"profile_name": "Work",
+			"email": "user@example.com",
+			"full_name": "John Doe",
+			"imaphost": "imap.gmail.com",
+			"imapport": 993,
+			"imapuser": "user@example.com",
+			"smtphost": "smtp.gmail.com",
+			"smtpport": 587,
+			"smtpuser": "user@example.com"
+		},
+		{
+			"profile_name": "Personal",
+			"email": "john.doe@gmail.com",
+			"full_name": "John Doe",
+			"imaphost": "imap.gmail.com",
+			"imapport": 993,
+			"imapuser": "john.doe@gmail.com",
+			"smtphost": "smtp.gmail.com",
+			"smtpport": 587,
+			"smtpuser": "john.doe@gmail.com"
+		}
+	]
+}

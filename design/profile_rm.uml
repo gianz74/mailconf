@@ -1,0 +1,21 @@
+@startuml
+autoactivate on
+actor Actor
+participant Mailconf
+Actor -> Mailconf : rm(profile)
+activate Mailconf
+Mailconf -> Mailconf: is_config_modifiable()
+Mailconf -->Mailconf: modifiable
+alt !modifiable
+	Mailconf -> Mailconf: force_changes?
+	Mailconf --> Mailconf: ok
+	alt !ok
+		Mailconf --> Actor: Done
+	end
+end
+Mailconf -> Mailconf: remove_profile
+activate Mailconf
+Mailconf --> Mailconf: Done
+deactivate Mailconf
+Mailconf --> Actor: Done
+@enduml

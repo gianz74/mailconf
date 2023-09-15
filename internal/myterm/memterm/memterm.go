@@ -22,6 +22,21 @@ func (t *_memterm) ReadLine(prompt string) (string, error) {
 	return "", io.EOF
 }
 
+func (t *_memterm) YesNo(prompt string) bool {
+	ans, err := t.ReadLine(prompt)
+	if err != nil {
+		return false
+	}
+
+	if len(ans) == 0 {
+		ans = "n"
+	}
+	if ans[0] == 'y' || ans[0] == 'Y' {
+		return true
+	}
+	return false
+}
+
 func (t *_memterm) ReadPass(prompt string) (string, error) {
 	return t.ReadLine(prompt)
 }

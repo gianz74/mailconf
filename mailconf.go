@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"html/template"
 	"path"
+	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/gianz74/mailconf/internal/config"
 	"github.com/gianz74/mailconf/internal/cred"
@@ -19,11 +19,26 @@ import (
 )
 
 var (
-	ErrProfileExists  = errors.New("Profile exists")
-	ErrOsNotSupported = errors.New("OS not supported")
+	ErrProfileExists           = errors.New("Profile exists")
+	ErrModified                = errors.New("Config modified externally")
+	ErrProfileNotFound         = errors.New("Profile not found")
+	ErrOsNotSupported          = errors.New("OS not supported")
+	ErrMbsyncStatusUnknown     = errors.New("Mbsync: unknown status")
+	ErrMbsyncNotFound          = errors.New("Mbsync: Service not found")
+	ErrImapnotifyStatusUnknown = errors.New("Imapnotify: unknown status")
+	ErrImapnotifyNotFound      = errors.New("Imapnotify: Service not found")
 )
 
 func AddProfile(profile string, cfg *config.Config) error {
+
+	if isConfModified(cfg) {
+		t := myterm.New()
+		yes := t.YesNo("Configuration modified by an external program. Overwrite? [y/n]: ")
+		if !yes {
+			return ErrModified
+		}
+	}
+
 	for _, p := range cfg.Profiles {
 		if profile == p.Name {
 			return ErrProfileExists
@@ -145,111 +160,73 @@ func AddProfile(profile string, cfg *config.Config) error {
 }
 
 func Generate(cfg *config.Config, profile *config.Profile) error {
-	err := generatemu4e(cfg)
-	if err != nil {
-		return err
-	}
-
-	err = generatembsyncrc(os.System, cfg)
-	if err != nil {
-		return err
-	}
-
-	err = generateimapfilter(os.System, cfg)
-	if err != nil {
-		return err
-	}
-
-	err = generateimapnotify(os.System, profile)
+	err := generatemu4e(cfg, true)
 	if err != nil {
 		return err
 	}
 
 	mbsync := service.NewMbsync(cfg)
-	err = mbsync.GenConf(false)
+	err = mbsync.GenConf(true)
 	t := myterm.New()
-	mbsyncNew := true
 	if err != nil {
-		ans, err := t.ReadLine("service file for mbsync already exists. Overwrite? [y/n]: ")
-		if err != nil {
-			return err
-		}
-
-		if len(ans) == 0 {
-			ans = "n"
-		}
-		if ans[0] == 'y' || ans[0] == 'Y' {
-			err := mbsync.Stop()
-			if err != nil {
-				return err
-			}
-
-			err = mbsync.Enable()
-			if err != nil {
-				return err
-			}
-
+		yes := t.YesNo("service file for mbsync already exists. Overwrite? [y/n]: ")
+		if yes {
+			mbsync.Stop()
+			mbsync.Disable()
 			err = mbsync.GenConf(true)
 			if err != nil {
 				return err
 			}
-		} else {
-			mbsyncNew = false
 		}
 	}
-	if mbsyncNew {
-		err = mbsync.Enable()
-		if err != nil {
-			return err
-		}
 
-		err = mbsync.Start()
-		if err != nil {
-			return err
-		}
+	status := mbsync.Status()
+
+	switch status {
+	case service.DisabledStopped:
+		mbsync.Enable()
+		mbsync.Start()
+	case service.DisabledRunning:
+		mbsync.Enable()
+	case service.EnabledStopped:
+		mbsync.Start()
+	case service.EnabledRunning:
+		break
+	case service.NotFound:
+		return ErrMbsyncNotFound
+	case service.Unknown:
+		return ErrMbsyncStatusUnknown
 	}
 
 	imapnotify := service.NewImapnotify(cfg, profile)
-	err = imapnotify.GenConf(false)
-	imapnotifynew := true
+	err = imapnotify.GenConf(true)
 	if err != nil {
-		ans, err := t.ReadLine("imapnotify service file for " + profile.Name + " already exists. Overwrite? [y/n]: ")
-		if err != nil {
-			return err
-		}
-
-		if len(ans) == 0 {
-			ans = "n"
-		}
-		if ans[0] == 'y' || ans[0] == 'Y' {
-			err := imapnotify.Stop()
-			if err != nil {
-				return err
-			}
-
-			err = imapnotify.Disable()
-			if err != nil {
-				return err
-			}
-
+		yes := t.YesNo("imapnotify service file for " + profile.Name + " already exists. Overwrite? [y/n]: ")
+		if yes {
+			imapnotify.Stop()
+			imapnotify.Disable()
 			err = imapnotify.GenConf(true)
 			if err != nil {
 				return err
 			}
-		} else {
-			imapnotifynew = false
 		}
 	}
-	if imapnotifynew {
-		err = imapnotify.Enable()
-		if err != nil {
-			return err
-		}
+	status = imapnotify.Status()
 
-		err = imapnotify.Start()
-		if err != nil {
-			return err
-		}
+	switch status {
+	case service.DisabledStopped:
+		imapnotify.Enable()
+		imapnotify.Start()
+	case service.DisabledRunning:
+		imapnotify.Enable()
+	case service.EnabledStopped:
+		imapnotify.Start()
+	case service.EnabledRunning:
+		break
+	case service.NotFound:
+		return ErrImapnotifyNotFound
+	case service.Unknown:
+		return ErrImapnotifyStatusUnknown
 	}
 
 	return nil
@@ -258,7 +235,7 @@ func Generate(cfg *config.Config, profile *config.Profile) error {
 //go:embed templates/mu4e.tpl
 var mu4e string
 
-func generatemu4e(cfg *config.Config) error {
+func generatemu4e(cfg *config.Config, force bool) error {
 	tmpl, err := template.New("mu4e").Parse(mu4e)
 	if err != nil {
 		return err
@@ -270,117 +247,83 @@ func generatemu4e(cfg *config.Config) error {
 		return err
 
 	}
+	tmp, err := os.ReadFile(path.Join(cfg.EmacsCfgDir, "mu4e.el"))
+	if err == nil && !(reflect.DeepEqual(tmp, mu4e.Bytes()) || force) {
+		return ErrModified
+	}
 	io.Write(path.Join(cfg.EmacsCfgDir, "mu4e.el"), mu4e.Bytes(), 0644)
 
 	return nil
 }
 
-//go:embed templates/mbsyncrc.tpl
-var mbsyncrc string
-
-func generatembsyncrc(OS string, cfg *config.Config) error {
-	tmpl, err := template.New("mbsyncrc").Parse(mbsyncrc)
-	if err != nil {
-		return err
+func RmProfile(profile string, cfg *config.Config) error {
+	var p *config.Profile
+	modified := isConfModified(cfg)
+	if modified {
+		t := myterm.New()
+		if !t.YesNo("Configuration modified by an external program. Overwrite? [y/n]: ") {
+			return ErrModified
+		}
 	}
-	var mbsyncrc = &bytes.Buffer{}
-	param := struct {
-		OS       string
-		Profiles []*config.Profile
-	}{
-		OS:       OS,
-		Profiles: cfg.Profiles,
-	}
-
-	err = tmpl.Execute(mbsyncrc, param)
-	if err != nil {
-		return err
-
-	}
-	home, err := os.UserHomeDir()
+	mbsync := service.NewMbsync(cfg)
+	err := mbsync.GenConf(true)
 	if err != nil {
 		return err
 	}
 
-	io.Write(path.Join(home, ".mbsyncrc"), mbsyncrc.Bytes(), 0644)
+	for idx, tmp := range cfg.Profiles {
+		if profile == tmp.Name {
+			p = tmp
+			cfg.Profiles = append(cfg.Profiles[:idx], cfg.Profiles[idx+1:]...)
+		}
+	}
+	if p == nil {
+		return ErrProfileNotFound
+	}
+	imapnotifysvc := service.NewImapnotify(cfg, p)
+	imapnotifysvc.Stop()
+	imapnotifysvc.Disable()
+	err = imapnotifysvc.Remove()
+	if err != nil {
+		return err
+	}
+
+	generatemu4e(cfg, true)
+
+	if len(cfg.Profiles) == 0 {
+		mbsync.Stop()
+		mbsync.Disable()
+		err := mbsync.Remove()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	err = mbsync.GenConf(true)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-//go:embed templates/imapfilter/config.lua.tmpl
-var configLua string
-
-//go:embed templates/imapfilter/certificates
-var certificates []byte
-
-func normalize(input string) string {
-	fields := strings.FieldsFunc(input, func(r rune) bool {
-		return r == '.' || r == '@'
-	})
-	return strings.Join(fields, "_")
-}
-
-func generateimapfilter(OS string, cfg *config.Config) error {
-	funcMap := template.FuncMap{
-		"normalize": normalize,
-	}
-
-	tmpl, err := template.New("configlua").Funcs(funcMap).Parse(configLua)
+func isConfModified(cfg *config.Config) bool {
+	err := generatemu4e(cfg, false)
 	if err != nil {
-		return err
+		return true
 	}
-
-	var configLua = &bytes.Buffer{}
-	param := struct {
-		OS       string
-		Profiles []*config.Profile
-	}{
-		OS:       OS,
-		Profiles: cfg.Profiles,
-	}
-
-	err = tmpl.Execute(configLua, param)
+	mbsync := service.NewMbsync(cfg)
+	err = mbsync.GenConf(false)
 	if err != nil {
-		return err
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
+		return true
 	}
 
-	io.Write(path.Join(home, ".imapfilter/certificates"), certificates, 0644)
-	io.Write(path.Join(home, ".imapfilter/config.lua"), configLua.Bytes(), 0644)
-
-	return nil
-}
-
-//go:embed templates/imapnotify/notify.conf.tmpl
-var imapnotify string
-
-func generateimapnotify(OS string, profile *config.Profile) error {
-	tmpl, err := template.New("imapnotify").Parse(imapnotify)
-	if err != nil {
-		return err
+	for _, p := range cfg.Profiles {
+		imapnotify := service.NewImapnotify(cfg, p)
+		err := imapnotify.GenConf(false)
+		if err != nil {
+			return true
+		}
 	}
-
-	param := struct {
-		OS      string
-		Profile *config.Profile
-	}{
-		OS:      OS,
-		Profile: profile,
-	}
-	imapnotify := &bytes.Buffer{}
-	err = tmpl.Execute(imapnotify, param)
-	if err != nil {
-		return err
-	}
-	cfgdir, err := os.UserConfigDir()
-	if err != nil {
-		return err
-	}
-
-	io.Write(path.Join(cfgdir, "imapnotify/"+profile.Name+"/notify.conf"), imapnotify.Bytes(), 0644)
-
-	return nil
+	return false
 }

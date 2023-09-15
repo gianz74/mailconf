@@ -2,12 +2,12 @@ package service
 
 import (
 	"io/ioutil"
-	"path"
-	"reflect"
 	"testing"
 
 	"github.com/gianz74/mailconf/internal/config"
+	"github.com/gianz74/mailconf/internal/options"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/gianz74/mailconf/internal/testutil"
 	"github.com/spf13/afero"
 )
 
@@ -16,13 +16,13 @@ var (
 )
 
 func setup() {
-	oldFs = os.Set(&afero.Afero{
-		Fs: afero.NewMemMapFs(),
-	})
+	os.UserConfigDir = func() (string, error) { return "/home/user/.config", nil }
+	os.UserHomeDir = func() (string, error) { return "/home/user", nil }
+	setupMockServices()
 }
 
 func restore() {
-	os.Set(oldFs)
+	restoreServices()
 }
 
 func fixture(path string) []byte {
@@ -31,73 +31,6 @@ func fixture(path string) []byte {
 		panic(err)
 	}
 	return b
-}
-
-func NewmockMbsync(cfg *config.Config, system string) Service {
-	switch system {
-	case "linux":
-		return NewmockMbsyncLinux(cfg)
-	case "darwin":
-		return NewmockMbsyncDarwin(cfg)
-	default:
-		return nil
-	}
-}
-
-func NewmockMbsyncLinux(cfg *config.Config) Service {
-	return &mockMbsyncLinux{
-		MbsyncLinux: MbsyncLinux{
-			cfg: cfg,
-		},
-	}
-}
-
-type mockMbsyncLinux struct {
-	MbsyncLinux
-}
-
-func (mockMbsyncLinux) Start() error {
-	return nil
-}
-
-func (mockMbsyncLinux) Stop() error {
-	return nil
-}
-
-func (mockMbsyncLinux) Enable() error {
-	return nil
-}
-
-func (mockMbsyncLinux) Disable() error {
-	return nil
-}
-
-func NewmockMbsyncDarwin(cfg *config.Config) Service {
-	return &mockMbsyncDarwin{
-		MbsyncDarwin: MbsyncDarwin{
-			cfg: cfg,
-		},
-	}
-}
-
-type mockMbsyncDarwin struct {
-	MbsyncDarwin
-}
-
-func (mockMbsyncDarwin) Start() error {
-	return nil
-}
-
-func (mockMbsyncDarwin) Stop() error {
-	return nil
-}
-
-func (mockMbsyncDarwin) Enable() error {
-	return nil
-}
-
-func (mockMbsyncDarwin) Disable() error {
-	return nil
 }
 
 func TestGenerateMbsync(t *testing.T) {
@@ -135,53 +68,263 @@ func TestGenerateMbsync(t *testing.T) {
 			nil,
 		},
 	}
-	setup()
-	defer restore()
 
 	for _, tc := range tt {
 		for _, system := range tc.systems {
-			svc := NewmockMbsync(tc.config, system)
+			setup()
+			defer restore()
+			var fs afero.Afero
+			os.System = system
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name))
+			os.Set(fs)
+			svc := NewMbsync(tc.config)
 			err := svc.GenConf(tc.force)
 			if err != tc.err {
 				t.Fatalf("%s: got: %v, want: %v", tc.name, err, tc.err)
 			}
-			var got []byte
-			var want []byte
-			switch system {
-			case "linux":
-				cfgdir, err := os.UserConfigDir()
+			for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+				got, err := testutil.Result(file)
 				if err != nil {
-					t.Fatalf("cannot get user config dir: %v", err)
+					t.Fatalf("%s (%s): missing file %s\n", tc.name, system, file)
 				}
-				got, err = os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.service"))
-				if err != nil {
-					t.Fatalf("cannot get written file: %v\n", err)
-				}
-				want = fixture("/generatembsync/" + tc.name + "/" + system + "/mbsync.service")
-				got, err = os.ReadFile(path.Join(cfgdir, "systemd/user/mbsync.timer"))
-				if err != nil {
-					t.Fatalf("cannot get written file: %v\n", err)
-				}
-				want = fixture("/generatembsync/" + tc.name + "/" + system + "/mbsync.timer")
-			case "darwin":
-				homedir, err := os.UserHomeDir()
-				if err != nil {
-					t.Fatalf("cannot get user home dir: %v", err)
-				}
-				got, err = os.ReadFile(path.Join(homedir, "Library/LaunchAgents/local.mbsync.plist"))
-				if err != nil {
-					t.Fatalf("cannot get written file: %v\n", err)
-				}
-				want = fixture("/generatembsync/" + tc.name + "/" + system + "/local.mbsync.plist")
-			}
-			if err != nil {
-				t.Fatalf("file not saved: %v", err)
 
+				want := testutil.Fixture(t.Name(), tc.name, system, file)
+				if got != want {
+					t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
+				}
 			}
-			if !reflect.DeepEqual(want, got) {
-				t.Fatalf("%s: got: %s, want: %s", tc.name, got, want)
-			}
-
 		}
 	}
 }
+
+func TestRemoveMbsync(t *testing.T) {
+	tt := []struct {
+		name    string
+		systems []string
+		err     error
+	}{
+		{
+			"single",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			nil,
+		},
+	}
+
+	for _, tc := range tt {
+		for _, system := range tc.systems {
+			setup()
+			defer restore()
+			var fs afero.Afero
+			os.System = system
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name), testutil.System(system))
+			os.Set(fs)
+			cfg := config.Read()
+			svc := NewMbsync(cfg)
+			options.Set(options.OptVerbose(true))
+			err := svc.Remove()
+			if err != tc.err {
+				t.Fatalf("%s: got: %v, want: %v", tc.name, err, tc.err)
+			}
+			for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+				_, err = testutil.Result(file)
+				if err == nil {
+					t.Fatalf("%s (%s): file %s not removed\n", tc.name, system, file)
+				}
+			}
+		}
+	}
+}
+
+func TestGenerateimapnotify(t *testing.T) {
+	tt := []struct {
+		name    string
+		systems []string
+		profile *config.Profile
+		err     error
+	}{
+		{
+			"single",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			&config.Profile{
+				Name:     "Work",
+				FullName: "John Doe",
+				Email:    "jdoe@gmail.com",
+				ImapHost: "imap.gmail.com",
+				ImapPort: 993,
+				ImapUser: "user@gmail.com",
+				SmtpHost: "smtp.gmail.com",
+				SmtpPort: 587,
+				SmtpUser: "user@gmail.com",
+			},
+			nil,
+		},
+	}
+	for _, tc := range tt {
+		for _, system := range tc.systems {
+			setup()
+			defer restore()
+			var fs afero.Afero
+			os.System = system
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name), testutil.System(system))
+			os.Set(fs)
+			err := generateimapnotify(tc.profile, false)
+			if err != nil {
+				t.Fatalf("cannot generate file: %v", err)
+			}
+			for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+				got, err := testutil.Result(file)
+				if err != nil {
+					t.Fatalf("%s (%s): missing file %s\n", tc.name, system, file)
+				}
+
+				want := testutil.Fixture(t.Name(), tc.name, system, file)
+				if got != want {
+					t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
+				}
+			}
+		}
+	}
+}
+
+func TestGeneratembsyncrc(t *testing.T) {
+	tt := []struct {
+		name    string
+		systems []string
+		err     error
+	}{
+		{
+			"single",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			nil,
+		},
+		{
+			"two_profiles",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			nil,
+		},
+	}
+	for _, tc := range tt {
+		for _, system := range tc.systems {
+			setup()
+			defer restore()
+			var fs afero.Afero
+			os.System = system
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name), testutil.System(system))
+			os.Set(fs)
+			cfg := config.Read()
+
+			err := generatembsyncrc(cfg, false)
+			if err != nil {
+				t.Fatalf("cannot generate file: %v", err)
+			}
+
+			for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+				got, err := testutil.Result(file)
+				if err != nil {
+					t.Fatalf("%s (%s): missing file %s\n", tc.name, system, file)
+				}
+
+				want := testutil.Fixture(t.Name(), tc.name, system, file)
+				if got != want {
+					t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
+				}
+			}
+		}
+	}
+}
+
+func TestGenerateimapfilter(t *testing.T) {
+	tt := []struct {
+		name    string
+		systems []string
+		err     error
+	}{
+		{
+			"single",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			nil,
+		},
+		{
+			"two_profiles",
+			[]string{
+				"linux",
+				"darwin",
+			},
+			nil,
+		},
+	}
+	for _, tc := range tt {
+		for _, system := range tc.systems {
+			setup()
+			defer restore()
+			var fs afero.Afero
+			os.System = system
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name), testutil.System(system))
+			os.Set(fs)
+			cfg := config.Read()
+
+			err := generateimapfilter(cfg, false)
+			if err != nil {
+				t.Fatalf("cannot generate file: %v", err)
+			}
+
+			for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+				got, err := testutil.Result(file)
+				if err != nil {
+					t.Fatalf("%s (%s): missing file %s\n", tc.name, system, file)
+				}
+
+				want := testutil.Fixture(t.Name(), tc.name, system, file)
+				if got != want {
+					t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
+				}
+			}
+		}
+	}
+}
+
+func setupMockServices() {
+	SetMbsync(newMockMbsync)
+	SetImapnotify(newMockImapnotify)
+}
+
+func restoreServices() {
+	SetMbsync(MbsyncCtor)
+	SetImapnotify(ImapnotifyCtor)
+}
+
+func newMockMbsync(cfg *config.Config) Service {
+	return &MockService{
+		Service: MbsyncCtor(cfg),
+	}
+}
+
+func newMockImapnotify(cfg *config.Config, profile *config.Profile) Service {
+	return &MockService{
+		Service: ImapnotifyCtor(cfg, profile),
+	}
+}
+
+type MockService struct {
+	Service
+}
+
+func (MockService) Start()   {}
+func (MockService) Stop()    {}
+func (MockService) Enable()  {}
+func (MockService) Disable() {}

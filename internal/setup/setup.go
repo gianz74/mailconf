@@ -13,6 +13,7 @@ import (
 	"github.com/gianz74/mailconf/internal/config"
 	"github.com/gianz74/mailconf/internal/io"
 	"github.com/gianz74/mailconf/internal/myterm"
+	"github.com/gianz74/mailconf/internal/options"
 	"github.com/gianz74/mailconf/internal/os"
 )
 
@@ -55,7 +56,7 @@ func init() {
 }
 
 func runSetup(cmd *base.Command, args []string) error {
-	io.SetWriter(io.GetWriter(dryrun, verbose))
+	options.Set(options.OptDryrun(dryrun), options.OptVerbose(verbose))
 	cfg := config.Read()
 	if cfg != nil {
 		return ErrExists
@@ -64,7 +65,7 @@ func runSetup(cmd *base.Command, args []string) error {
 	cfg = config.NewConfig()
 
 	t := myterm.New()
-	emacsdir, err := t.ReadLine("enter emacs config directory")
+	emacsdir, err := t.ReadLine("enter emacs config directory: ")
 	if err != nil {
 		return err
 	}

@@ -21,13 +21,21 @@ type Option func(*options)
 
 type options struct {
 	name     *string
+	subname  *string
 	system   *string
 	savedata bool
+	copy     bool
 }
 
 func Name(name string) Option {
 	return func(o *options) {
 		o.name = &name
+	}
+}
+
+func SubName(name string) Option {
+	return func(o *options) {
+		o.subname = &name
 	}
 }
 
@@ -40,6 +48,12 @@ func System(system string) Option {
 func SaveData() Option {
 	return func(o *options) {
 		o.savedata = true
+	}
+}
+
+func CopyFs() Option {
+	return func(o *options) {
+		o.copy = true
 	}
 }
 
@@ -58,6 +72,9 @@ func NewFs(o ...Option) afero.Afero {
 	if opts.name != nil {
 		fspath = path.Join(fspath, *opts.name)
 	}
+	if opts.subname != nil {
+		fspath = path.Join(fspath, *opts.subname)
+	}
 	if opts.system != nil {
 		fspath = path.Join(fspath, *opts.system)
 	}
@@ -70,6 +87,41 @@ func NewFs(o ...Option) afero.Afero {
 	} else {
 		shadow = afero.NewMemMapFs()
 	}
+
+	if opts.copy {
+		tmpsfs := afero.Afero{
+			Fs: base,
+		}
+		type exch struct {
+			filename string
+			info     os.FileInfo
+		}
+		out := make(chan exch)
+		go func(o chan exch) {
+			rootpath := "/"
+			err := tmpsfs.Walk(rootpath, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					o <- exch{path[len(rootpath):], info}
+				}
+				return nil
+			})
+			close(o)
+			if err != nil {
+				panic(err)
+			}
+		}(out)
+		ret := afero.Afero{
+			Fs: shadow,
+		}
+		for ex := range out {
+			src, _ := tmpsfs.ReadFile(ex.filename)
+			ret.WriteFile(ex.filename, src, ex.info.Mode())
+		}
+		return ret
+	}
 	ret := afero.Afero{}
 
 	ret.Fs = afero.NewCopyOnWriteFs(base, shadow)
@@ -77,26 +129,26 @@ func NewFs(o ...Option) afero.Afero {
 	return ret
 }
 
-func Fixture(name, system, file string) string {
-	b, err := ioutil.ReadFile(path.Join(prefix, name, system, "want", file))
+func Fixture(name, subname, system, file string) string {
+	b, err := ioutil.ReadFile(path.Join(prefix, name, subname, system, "want", file))
 	if err != nil {
 		panic(err)
 	}
 	return string(b)
 }
 
-func Result(file string) string {
+func Result(file string) (string, error) {
 	b, err := myos.ReadFile(file)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return string(b)
+	return string(b), nil
 }
 
-func GetFiles(name, system string) <-chan string {
+func GetFiles(name, subname, system string) <-chan string {
 	out := make(chan string)
 	go func(o chan string) {
-		rootpath := path.Join(prefix, name, system, "want")
+		rootpath := path.Join(prefix, name, subname, system, "want")
 		err := filepath.Walk(rootpath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err

@@ -28,12 +28,12 @@
     - [-] [user config dir]/imapnotify
     - [-] all service files
     - [-] [user config dir]/mailconf
-- [-] profile [0/4]
+- [-] profile [1/4]
   - [-] list
     prints the list of configured profiles
-  - [-] add <profile> [0/1]
-    - [-] if setup has been run: [user config dir]/mailconf/data.json exists: [0/1]
-      - [-] if <profile> does not exist: [9/12]
+  - [X] add <profile> [1/1]
+    - [X] if setup has been run: [user config dir]/mailconf/data.json exists: [1/1]
+      - [X] if <profile> does not exist: [12/12]
 	- [X] ask imap and smtp data (host, port, username, password)
 	- [X] ask shortcut key for profile selection in mu4e
 	- [X] save credentials in the appropriate keychain
@@ -45,10 +45,10 @@
 	- [X] generate [user config dir]/imapnotify/[profile]/notify.conf
 	- [X] if service file for mbsync does not exist: [1/1]
 	  - [X] generate service file for mbsync
-	- [-] generate service file [service dir]/[imapnotify.profile]
-	- [-] if service file for mbsync just created: [0/1]
-	  - [-] enable service for mbsync
-	- [-] enable service for [imapnotify.profile]
+	- [X] generate service file [service dir]/[imapnotify.profile]
+	- [X] if service file for mbsync just created: [1/1]
+	  - [X] enable service for mbsync
+	- [X] enable service for [imapnotify.profile]
   - [-] rm <profile> [0/1]
     - [-] if <profile> exists: [0/8]
       - [-] disable service for [imapnotify.profile] [0/1]
@@ -59,12 +59,14 @@
 	  - [-] remove service for mbsync
       - [-] remove profile credentials from keychain
       - [-] remove [user config dir]/imapnotify/[profile]/
-      - [-] if <profile> is the last one: [0/2]
+      - [-] if <profile> is the last one: [0/3]
 	- [-] remove ~/.mbsyncrc
 	- [-] remove ~/.imapfilter/
+	- [-] empty mu4e configuration (leaving the empty file)
       - [-] else: [0/2]
 	- [-] regenerate ~/.mbsyncrc
 	- [-] regenerate ~/.imapfilter/{config.lua,certificates}
+	- [-] regenerate mu4e configuration
       - [-] remove [user config dir]/imapnotify/[profile]/
       - [-] update [user config dir]/mailconf/data.json
   - [-] edit [0/1]
@@ -89,3 +91,21 @@
 - [-] help [command]
   if used alone, provides usage line.
   otherwise will provide help for the specified command
+
+** TODO Refactor [0/2]
+- [-] mailconf.Generate: Review the logic and simplify it.
+  Consider generating configuration files, e.g. .mbsyncrc,
+  .imapfilter/config.lua, imapnotify/[Profile]/notify.conf from inside
+  the service objects.  logic: mbsync service uses .mbsyncrc and
+  .imapfilter/config.lua. Let the mbsync service generate them.  same
+  thing applies to the imapnotify service, which makes use of
+  imapnotify/[Profile]/notify.conf.
+- [-] Reconsider myterm logic: does the methods ReadLine, ReadPass and
+  YesNo ever return any error?  removing the returned error will
+  simplify the code a lot and make it more readable.
+- [-] myterm: is there a better way to provide prompts and return
+  answers? Like an array of prompts associated with an array of
+  variables... or anything better than the current way.
+- [-] mbsynclinux: GenConf should also generate .mbsyncrc and .imapfilter/config.lua
+
+

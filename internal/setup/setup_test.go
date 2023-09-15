@@ -9,6 +9,7 @@ import (
 	"github.com/gianz74/mailconf/internal/myterm"
 	"github.com/gianz74/mailconf/internal/myterm/memterm"
 	"github.com/gianz74/mailconf/internal/os"
+	"github.com/gianz74/mailconf/internal/service/mockservice"
 	"github.com/gianz74/mailconf/internal/testutil"
 	"github.com/spf13/afero"
 )
@@ -24,7 +25,12 @@ func setup() error {
 	os.UserConfigDir = func() (string, error) { return "/home/user/.config", nil }
 	os.UserHomeDir = func() (string, error) { return "/home/user", nil }
 	cred.SetStore(mockCredStore)
+	mockservice.SetupMockServices()
 	return nil
+}
+
+func restore() {
+	mockservice.RestoreServices()
 }
 
 func readConf() (string, error) {
@@ -145,9 +151,10 @@ func TestSetup(t *testing.T) {
 		for _, system := range tc.systems {
 			var fs afero.Afero
 			os.System = system
-			fs = testutil.NewFs(testutil.Name(tc.name), testutil.System(system))
+			fs = testutil.NewFs(testutil.Name(t.Name()), testutil.SubName(tc.name), testutil.System(system))
 			os.Set(fs)
 			err := setup()
+			defer restore()
 			if err != nil {
 				t.Fatalf("%s: cannot prepare environment: %v\n", tc.name, err)
 			}
@@ -159,9 +166,13 @@ func TestSetup(t *testing.T) {
 				t.Fatalf("%s: got error %v, want: %v\n", tc.name, err, tc.err)
 			}
 			if tc.err == nil {
-				for file := range testutil.GetFiles(tc.name, system) {
-					got := testutil.Result(file)
-					want := testutil.Fixture(tc.name, system, file)
+				for file := range testutil.GetFiles(t.Name(), tc.name, system) {
+					got, err := testutil.Result(file)
+					if err != nil {
+						t.Fatalf("%s (%s): missing file %s\n", tc.name, system, file)
+					}
+
+					want := testutil.Fixture(t.Name(), tc.name, system, file)
 					if got != want {
 						t.Fatalf("%s: got: %s, want: %s\n", tc.name, got, want)
 					}

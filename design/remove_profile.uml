@@ -1,0 +1,36 @@
+@startuml
+autoactivate on
+participant Mailconf as mc
+participant Mu4e as me
+participant Mbsync as mb
+participant Imapnotify as im
+[-> mc: isConfModified(cfg)
+create me
+mc -> me: generatemu4e(force = false)
+return Err
+destroy me
+note over mc: modified = false
+alt Err != nil
+	note over mc: modified = true
+end
+create mb
+mc -> mb: New(cfg)
+mc -> mb: GenConf(force = false)
+return Err
+destroy mb
+alt Err != nil
+	note over mc : modified = true
+end
+loop for every profile in cfg
+	create im
+	mc -> im : New(cfg, profile)
+	mc -> im : GenConf(force = false)
+	return Err
+	destroy im
+	alt Err != nil
+		note over mc : modified = true
+	end
+end
+mc -->[: modifiable
+deactivate mc
+@enduml

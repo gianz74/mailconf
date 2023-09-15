@@ -1,0 +1,17 @@
+{
+	"emacs_cfg_dir": "/home/user/.emacs.d",
+	"bindir": "/home/user/.local/bin",
+	"profiles": [
+		{
+			"profile_name": "Work",
+			"email": "jdoe@gmail.com",
+			"full_name": "John Doe",
+			"imaphost": "imap.gmail.com",
+			"imapport": 993,
+			"imapuser": "user@gmail.com",
+			"smtphost": "smtp.gmail.com",
+			"smtpport": 587,
+			"smtpuser": "user@gmail.com"
+		}
+	]
+}
